@@ -1,0 +1,14 @@
+# Core runtime for the blind starter kit.
+accelerate>=1.0.0
+huggingface_hub>=0.30.0
+imageio[ffmpeg]>=2.34.0
+librosa>=0.10.2
+numpy>=1.26.0
+pillow>=10.0.0
+qwen-vl-utils>=0.0.8
+requests>=2.31.0
+safetensors>=0.4.5
+sentencepiece>=0.2.0
+soundfile>=0.12.1
+peft>=0.14.0
+transformers>=4.56.0

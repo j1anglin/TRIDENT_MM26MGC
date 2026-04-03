@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+
+starter_kit_outputs/
+starter_kit_eval_cache/
+
+.venv/
+.env

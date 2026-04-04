@@ -160,6 +160,7 @@ Validator behavior:
 - OEQ artifact mappings are written under `starter_kit_outputs/evaluation_results/oeq_mappings/` by default.
 - Official OEQ evaluation uses the organizer-frozen OpenAI model `gpt-5.4-mini`.
 - Local runs default to the bundled local evaluator unless you override `--oeq-evaluator-backend` and `--oeq-evaluator-model`.
+- For local OEQ evaluation, `--oeq-evaluator-batch-size` controls the micro-batch size used by the local text evaluator. The default is `1`.
 
 For detailed metric definitions, read [docs/METRICS.md](/project/aimm/trident/starter_kit/docs/METRICS.md).
 

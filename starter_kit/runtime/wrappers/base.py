@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
 
@@ -62,3 +62,6 @@ class BaseModelWrapper:
 
     def generate(self, sample: Any) -> str:  # pragma: no cover
         raise NotImplementedError
+
+    def generate_batch(self, samples: Sequence[Any]) -> List[str]:
+        return [self.generate(sample) for sample in samples]

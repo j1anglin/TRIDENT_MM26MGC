@@ -173,6 +173,50 @@ def _generate_and_write_mapping_record(
     wrapper,
     resolved_model: str,
 ) -> Dict[str, Any]:
+    return _generate_mapping_record(
+        sample=sample,
+        sample_path=sample_path,
+        wrapper=wrapper,
+        resolved_model=resolved_model,
+    )
+
+
+def _build_mapping_record(
+    *,
+    sample: TaskSample,
+    resolved_model: str,
+    response_text: str,
+    latency_ms: float,
+    usage_metadata: Optional[Dict[str, Any]],
+    error_message: Optional[str] = None,
+) -> Dict[str, Any]:
+    record = ModelResponse(
+        model_id=resolved_model,
+        sample=sample,
+        response=response_text,
+        latency_ms=latency_ms,
+        usage_metadata=usage_metadata,
+    ).to_json()
+    if error_message:
+        record["error"] = error_message
+    return record
+
+
+def _write_mapping_record(sample_path: Path, record: Dict[str, Any]) -> None:
+    sample_path.parent.mkdir(parents=True, exist_ok=True)
+    sample_path.write_text(
+        json.dumps(record, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _generate_mapping_record(
+    *,
+    sample: TaskSample,
+    sample_path: Path,
+    wrapper,
+    resolved_model: str,
+) -> Dict[str, Any]:
     error_message = None
     response_text = ""
     usage_metadata = None
@@ -186,22 +230,63 @@ def _generate_and_write_mapping_record(
         error_message = str(exc)
         response_text = f"[ERROR] {error_message}"
 
-    record = ModelResponse(
-        model_id=resolved_model,
+    record = _build_mapping_record(
         sample=sample,
-        response=response_text,
+        resolved_model=resolved_model,
+        response_text=response_text,
         latency_ms=(time.time() - start) * 1000.0,
         usage_metadata=usage_metadata,
-    ).to_json()
-    if error_message:
-        record["error"] = error_message
-
-    sample_path.parent.mkdir(parents=True, exist_ok=True)
-    sample_path.write_text(
-        json.dumps(record, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+        error_message=error_message,
     )
+    _write_mapping_record(sample_path, record)
     return record
+
+
+def _generate_mapping_records_batch(
+    *,
+    samples: Sequence[TaskSample],
+    sample_paths: Sequence[Path],
+    wrapper,
+    resolved_model: str,
+) -> List[Dict[str, Any]]:
+    if not samples:
+        return []
+
+    start = time.time()
+    try:
+        if hasattr(wrapper, "last_usage"):
+            wrapper.last_usage = None
+        responses = wrapper.generate_batch(samples)
+        usage_metadata = getattr(wrapper, "last_usage", None)
+        if len(responses) != len(samples):
+            raise RuntimeError(
+                f"Batch evaluator returned {len(responses)} responses for {len(samples)} samples."
+            )
+    except Exception:
+        return [
+            _generate_mapping_record(
+                sample=sample,
+                sample_path=sample_path,
+                wrapper=wrapper,
+                resolved_model=resolved_model,
+            )
+            for sample, sample_path in zip(samples, sample_paths)
+        ]
+
+    latency_ms = (time.time() - start) * 1000.0
+    per_sample_latency_ms = latency_ms / len(samples)
+    records: List[Dict[str, Any]] = []
+    for sample, sample_path, response_text in zip(samples, sample_paths, responses):
+        record = _build_mapping_record(
+            sample=sample,
+            resolved_model=resolved_model,
+            response_text="" if response_text is None else str(response_text),
+            latency_ms=per_sample_latency_ms,
+            usage_metadata=usage_metadata,
+        )
+        _write_mapping_record(sample_path, record)
+        records.append(record)
+    return records
 
 
 def run_llm_mapping(
@@ -211,7 +296,7 @@ def run_llm_mapping(
     backend: str,
     model_id: Optional[str] = None,
     analysis_field: str = "response",
-    batch_size: int = 200,
+    batch_size: int = 1,
     poll_interval: int = 30,
     max_parallel_batches: int = 1,
     concurrency: int = 1,
@@ -265,8 +350,25 @@ def run_llm_mapping(
             cache_dir=cache_dir,
             offline=offline,
         )
+        local_batch_size = max(1, int(batch_size or 1)) if normalized_backend == "local" else 1
+        if normalized_backend == "local" and local_batch_size > 1:
+            for start_index in range(0, len(pending), local_batch_size):
+                chunk = pending[start_index : start_index + local_batch_size]
+                samples_chunk = [sample for _, sample, _ in chunk]
+                sample_paths_chunk = [sample_path for _, _, sample_path in chunk]
+                records = _generate_mapping_records_batch(
+                    samples=samples_chunk,
+                    sample_paths=sample_paths_chunk,
+                    wrapper=wrapper,
+                    resolved_model=resolved_model,
+                )
+                for _ in records:
+                    completed += 1
+                    _write_progress_line("OEQ mapping", completed, total_samples)
+            return resolved_model
+
         for _, sample, sample_path in pending:
-            _generate_and_write_mapping_record(
+            _generate_mapping_record(
                 sample=sample,
                 sample_path=sample_path,
                 wrapper=wrapper,

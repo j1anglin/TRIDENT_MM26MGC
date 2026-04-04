@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Sequence
 
 import torch
 
@@ -19,6 +20,14 @@ def _infer_device(model: torch.nn.Module) -> torch.device:
     for param in model.parameters():
         return param.device
     return torch.device("cpu")
+
+
+_LEADING_THINK_BLOCK_RE = re.compile(r"^\s*<think>\s*.*?</think>\s*", flags=re.DOTALL | re.IGNORECASE)
+
+
+def _strip_leading_reasoning_block(text: str) -> str:
+    stripped = _LEADING_THINK_BLOCK_RE.sub("", text or "", count=1)
+    return stripped.strip()
 
 
 class AutoTextWrapper(BaseModelWrapper):
@@ -58,10 +67,16 @@ class AutoTextWrapper(BaseModelWrapper):
         tokenizer = self.tokenizer
         if tokenizer is not None and hasattr(tokenizer, "apply_chat_template"):
             try:
+                template_kwargs: Dict[str, Any] = {
+                    "tokenize": False,
+                    "add_generation_prompt": True,
+                }
+                # Qwen3 enables reasoning by default; disable it for parser-friendly evaluator output.
+                if "qwen3" in str(self.model_id).lower():
+                    template_kwargs["enable_thinking"] = False
                 return tokenizer.apply_chat_template(
                     messages,
-                    tokenize=False,
-                    add_generation_prompt=True,
+                    **template_kwargs,
                 )
             except Exception:
                 pass
@@ -70,11 +85,7 @@ class AutoTextWrapper(BaseModelWrapper):
             return f"{self.system_hint.strip()}\n\n{prompt}"
         return prompt
 
-    def generate(self, sample: TaskSample) -> str:
-        self.ensure_loaded()
-        assert self.model is not None
-        assert self.tokenizer is not None
-
+    def _prepare_prompt(self, sample: TaskSample) -> str:
         if sample.modality not in {"text", "", None}:
             raise ValueError(f"AutoTextWrapper only supports text modality, received: {sample.modality}")
 
@@ -84,12 +95,9 @@ class AutoTextWrapper(BaseModelWrapper):
             prompt = f"{prefix}\n\n{prompt}" if prompt else prefix
         if not prompt:
             prompt = "Please answer the user query."
+        return self._build_prompt(prompt)
 
-        full_prompt = self._build_prompt(prompt)
-        model_inputs = self.tokenizer(full_prompt, return_tensors="pt")
-        device = _infer_device(self.model)
-        model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
-
+    def _generation_kwargs(self) -> Dict[str, Any]:
         gen_kwargs: Dict[str, Any] = {
             "max_new_tokens": self.max_new_tokens,
             "do_sample": False,
@@ -98,9 +106,20 @@ class AutoTextWrapper(BaseModelWrapper):
         }
         if self.generation_overrides:
             gen_kwargs.update(self.generation_overrides)
+        return gen_kwargs
+
+    def generate(self, sample: TaskSample) -> str:
+        self.ensure_loaded()
+        assert self.model is not None
+        assert self.tokenizer is not None
+
+        full_prompt = self._prepare_prompt(sample)
+        model_inputs = self.tokenizer(full_prompt, return_tensors="pt")
+        device = _infer_device(self.model)
+        model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
 
         with torch.inference_mode():
-            output_ids = self.model.generate(**model_inputs, **gen_kwargs)
+            output_ids = self.model.generate(**model_inputs, **self._generation_kwargs())
 
         input_ids = model_inputs["input_ids"]
         continuation = output_ids[:, input_ids.shape[-1] :]
@@ -109,4 +128,42 @@ class AutoTextWrapper(BaseModelWrapper):
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
         )[0]
-        return response.strip()
+        return _strip_leading_reasoning_block(response)
+
+    def generate_batch(self, samples: Sequence[TaskSample]) -> List[str]:
+        self.ensure_loaded()
+        assert self.model is not None
+        assert self.tokenizer is not None
+
+        if not samples:
+            return []
+
+        prompts = [self._prepare_prompt(sample) for sample in samples]
+        original_padding_side = getattr(self.tokenizer, "padding_side", "right")
+        self.tokenizer.padding_side = "left"
+        try:
+            model_inputs = self.tokenizer(
+                prompts,
+                return_tensors="pt",
+                padding=True,
+            )
+        finally:
+            self.tokenizer.padding_side = original_padding_side
+
+        device = _infer_device(self.model)
+        if hasattr(model_inputs, "to"):
+            model_inputs = model_inputs.to(device=device)
+        else:
+            model_inputs = {k: v.to(device) for k, v in model_inputs.items()}
+
+        with torch.inference_mode():
+            output_ids = self.model.generate(**model_inputs, **self._generation_kwargs())
+
+        input_length = model_inputs["input_ids"].shape[-1]
+        continuation = output_ids[:, input_length:]
+        responses = self.tokenizer.batch_decode(
+            continuation,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        )
+        return [_strip_leading_reasoning_block(response) for response in responses]

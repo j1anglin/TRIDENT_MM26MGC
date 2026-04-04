@@ -125,7 +125,8 @@ def parse_args() -> argparse.Namespace:
         "--perception-evaluator-batch-size",
         dest="oeq_evaluator_batch_size",
         type=int,
-        default=200,
+        default=1,
+        help="Local OEQ evaluator micro-batch size. Increase it if you have enough GPU memory.",
     )
     parser.add_argument(
         "--oeq-evaluator-poll-interval",
@@ -1479,7 +1480,7 @@ def evaluate_task_dir(
     oeq_evaluator_backend: str = "local",
     oeq_evaluator_model: Optional[str] = None,
     oeq_evaluator_analysis_field: str = "response",
-    oeq_evaluator_batch_size: int = 200,
+    oeq_evaluator_batch_size: int = 1,
     oeq_evaluator_poll_interval: int = 30,
     oeq_evaluator_max_parallel_batches: int = 1,
     oeq_evaluator_concurrency: int = 1,

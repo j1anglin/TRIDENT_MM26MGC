@@ -8,7 +8,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 STARTER_KIT_ROOT = PACKAGE_ROOT.parent
 IMPORT_ROOT = STARTER_KIT_ROOT
 
-DATA_ROOT_CANDIDATE_NAMES = ("tridf-blind", "data_blind")
+DATA_ROOT_CANDIDATE_NAMES = ("tridf-blind", "trident", "data_blind")
 
 
 def _resolve_repo_root() -> Path:

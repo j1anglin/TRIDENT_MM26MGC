@@ -66,7 +66,7 @@ python3 evaluate_predictions.py \
 python3 validate_submission.py --submission sample_submission
 ```
 
-By default, the starter kit looks for the blind package under `tridf-blind/`. If your copy lives elsewhere, pass `--data-root /path/to/tridf-blind`.
+By default, the starter kit looks for the blind package under `tridf-blind/`, `trident/`, or `data_blind/`. If your copy lives elsewhere, pass `--data-root /path/to/your-package-root`.
 
 ## Common Workflows
 

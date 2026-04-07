@@ -35,7 +35,7 @@ Participants may use the provided blind data, prompt templates, and starter-kit 
 
 These tasks ask automated questions about the existence or location of specific artifacts.
 
-- `tfq`: answer with a binary response string, using `yes` or `no` in the starter-kit tooling
+- `tfq`: answer with a binary response string, using `True` or `False` in the starter-kit tooling
 - `mcq`: answer with the selected option letters, for example `A, C`
 
 ### Type-A Open-Ended Questions: `typea_oeq`

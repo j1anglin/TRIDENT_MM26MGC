@@ -302,10 +302,10 @@ def _parse_mc_choices(text: str) -> Optional[list[str]]:
 def _parse_tf_answer(text: str) -> Optional[str]:
     if not text:
         return None
-    head = " ".join(text.strip().splitlines()[:2]).lower()
-    match = re.search(r"\b(yes|no)\b", head)
+    head = " ".join(text.strip().splitlines()[:2])
+    match = re.search(r"\b(true|false)\b", head, flags=re.IGNORECASE)
     if match:
-        return match.group(1)
+        return match.group(1).lower()
     return None
 
 

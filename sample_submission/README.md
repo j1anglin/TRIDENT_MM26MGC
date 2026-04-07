@@ -21,7 +21,7 @@ Canonical `response` formats for the current starter-kit tools:
 - `typeb_oeq.jsonl`: first non-empty line should contain `Likely Authentic` or `Likely Manipulated`, followed by a short reasoning paragraph. Example: `{"sample_id":"...","response":"Likely Manipulated\nThe face region shows temporal inconsistency and boundary artifacts."}`
 - `typea_oeq.jsonl`: free-form artifact description text. Example: `{"sample_id":"...","response":"Observable artifacts include mouth-boundary mismatch, inconsistent teeth rendering, and temporal flicker around the cheeks."}`
 - `mcq.jsonl`: selected option letters as a string. Example: `{"question_id":"...","response":"A, C"}`
-- `tfq.jsonl`: `yes` or `no` as a string. Example: `{"question_id":"...","response":"yes"}`
+- `tfq.jsonl`: `True` or `False` as a string. Example: `{"question_id":"...","response":"True"}`
 
 Notes:
 

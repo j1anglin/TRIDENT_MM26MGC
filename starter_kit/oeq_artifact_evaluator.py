@@ -296,7 +296,7 @@ def run_llm_mapping(
     backend: str,
     model_id: Optional[str] = None,
     analysis_field: str = "response",
-    batch_size: int = 1,
+    batch_size: int = 10,
     poll_interval: int = 30,
     max_parallel_batches: int = 1,
     concurrency: int = 1,

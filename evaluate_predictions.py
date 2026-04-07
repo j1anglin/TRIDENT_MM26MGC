@@ -31,7 +31,7 @@ from starter_kit.runtime.artifact_parser import parse_artifact_map
 
 
 MC_LETTER_RE = re.compile(r"\b([A-E])\b", flags=re.IGNORECASE)
-TF_RE = re.compile(r"\b(yes|no)\b", flags=re.IGNORECASE)
+TF_RE = re.compile(r"\b(true|false)\b", flags=re.IGNORECASE)
 OEQ_BASE_COLUMNS = {"sample_id", "media_path", "modality", "track_id", "label"}
 QUESTION_MODALITY_MAP = {
     "img": "image",
@@ -125,7 +125,7 @@ def parse_args() -> argparse.Namespace:
         "--perception-evaluator-batch-size",
         dest="oeq_evaluator_batch_size",
         type=int,
-        default=1,
+        default=10,
         help="Local OEQ evaluator micro-batch size. Increase it if you have enough GPU memory.",
     )
     parser.add_argument(
@@ -703,7 +703,7 @@ def _normalize_tf_answer(value: object) -> Optional[bool]:
     match = TF_RE.search(" ".join(value.strip().splitlines()[:2]))
     if not match:
         return None
-    return match.group(1).lower() == "yes"
+    return match.group(1).lower() == "true"
 
 
 def _parse_bool_truth(value: object) -> bool:
@@ -1480,7 +1480,7 @@ def evaluate_task_dir(
     oeq_evaluator_backend: str = "local",
     oeq_evaluator_model: Optional[str] = None,
     oeq_evaluator_analysis_field: str = "response",
-    oeq_evaluator_batch_size: int = 1,
+    oeq_evaluator_batch_size: int = 10,
     oeq_evaluator_poll_interval: int = 30,
     oeq_evaluator_max_parallel_batches: int = 1,
     oeq_evaluator_concurrency: int = 1,

@@ -114,7 +114,7 @@ Expected final files:
 - `typeb_oeq`: decide whether a sample is authentic or manipulated, then explain the decision
 - `typea_oeq`: describe the visible manipulation artifacts in a sample known to be fake
 - `mcq`: choose which listed artifacts are present
-- `tfq`: answer yes or no to an artifact verification question
+- `tfq`: answer True or False to an artifact verification question
 
 `typeb_oeq` and `typea_oeq` share the same OEQ artifact-evaluation pipeline.
 
@@ -144,7 +144,7 @@ Canonical `response` conventions for the current starter-kit tools:
 - `typeb_oeq`: first non-empty line contains `Likely Authentic` or `Likely Manipulated`, followed by a short justification paragraph
 - `typea_oeq`: structured free-form artifact description text
 - `mcq`: selected option letters such as `A, C`
-- `tfq`: `yes` or `no`
+- `tfq`: `True` or `False`
 
 Validator behavior:
 
@@ -160,7 +160,7 @@ Validator behavior:
 - OEQ artifact mappings are written under `starter_kit_outputs/evaluation_results/oeq_mappings/` by default.
 - Official OEQ evaluation uses the organizer-frozen OpenAI model `gpt-5.4-mini`.
 - Local runs default to the bundled local evaluator unless you override `--oeq-evaluator-backend` and `--oeq-evaluator-model`.
-- For local OEQ evaluation, `--oeq-evaluator-batch-size` controls the micro-batch size used by the local text evaluator. The default is `1`.
+- For local OEQ evaluation, `--oeq-evaluator-batch-size` controls the micro-batch size used by the local text evaluator. The default is `10`.
 
 For detailed metric definitions, read [docs/METRICS.md](/project/aimm/trident/starter_kit/docs/METRICS.md).
 

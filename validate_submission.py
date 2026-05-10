@@ -18,6 +18,16 @@ from starter_kit._bootstrap import DEFAULT_DATA_ROOT
 
 
 TASKS = ("typeb_oeq", "typea_oeq", "mcq", "tfq")
+MODALITIES = ("all", "image", "video", "audio")
+TRACK_MODALITIES = ("image", "video", "audio")
+MODALITY_ALIASES = {
+    "img": "image",
+    "image": "image",
+    "vid": "video",
+    "video": "video",
+    "aud": "audio",
+    "audio": "audio",
+}
 TASK_FILE_NAMES = {task: f"{task}.jsonl" for task in TASKS}
 TASK_ID_FIELDS = {
     "typeb_oeq": "sample_id",
@@ -34,6 +44,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", type=str, default="private_test", choices=("private_test", "public_val", "train"))
     parser.add_argument("--task", type=str, default="all", choices=(*TASKS, "all"))
     parser.add_argument(
+        "--modality",
+        type=str,
+        default="all",
+        choices=MODALITIES,
+        help=(
+            "Validate all modalities, or only the IDs required by one Codabench modality track. "
+            "Track-specific validation accepts extra IDs from other modalities as ignored records."
+        ),
+    )
+    parser.add_argument(
         "--allow-extra-keys",
         action="store_true",
         help="Do not warn when records contain keys beyond the required id field and response.",
@@ -46,11 +66,19 @@ def _selected_tasks(task: str) -> List[str]:
     return list(TASKS) if task == "all" else [task]
 
 
-def _load_expected_oeq_ids(data_root: Path, split: str) -> List[str]:
+def _selected_modalities(modality: str) -> Tuple[str, ...]:
+    return TRACK_MODALITIES if modality == "all" else (modality,)
+
+
+def _normalize_modality(value: object) -> Optional[str]:
+    return MODALITY_ALIASES.get(str(value or "").strip().lower())
+
+
+def _load_expected_oeq_ids(data_root: Path, split: str, modality: str) -> List[str]:
     expected: List[str] = []
     seen: set[str] = set()
-    for modality in ("audio", "image", "video"):
-        path = data_root / "OEQ" / split / f"manifest_{modality}.csv"
+    for selected_modality in _selected_modalities(modality):
+        path = data_root / "OEQ" / split / f"manifest_{selected_modality}.csv"
         with path.open("r", newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
                 sample_id = str(row.get("sample_id") or "").strip()
@@ -60,7 +88,7 @@ def _load_expected_oeq_ids(data_root: Path, split: str) -> List[str]:
     return expected
 
 
-def _load_expected_question_ids(data_root: Path, split: str, package_name: str) -> List[str]:
+def _load_expected_question_ids(data_root: Path, split: str, package_name: str, modality: str) -> List[str]:
     expected: List[str] = []
     seen: set[str] = set()
     for json_path in sorted((data_root / package_name / split).glob("*.json")):
@@ -70,6 +98,8 @@ def _load_expected_question_ids(data_root: Path, split: str, package_name: str) 
         for row in rows:
             if not isinstance(row, dict):
                 continue
+            if modality != "all" and _normalize_modality(row.get("modality")) != modality:
+                continue
             question_id = str(row.get("question_id") or "").strip()
             if question_id and question_id not in seen:
                 expected.append(question_id)
@@ -77,13 +107,13 @@ def _load_expected_question_ids(data_root: Path, split: str, package_name: str) 
     return expected
 
 
-def load_expected_ids(data_root: Path, split: str, task: str) -> List[str]:
+def load_expected_ids(data_root: Path, split: str, task: str, modality: str = "all") -> List[str]:
     if task in {"typeb_oeq", "typea_oeq"}:
-        return _load_expected_oeq_ids(data_root, split)
+        return _load_expected_oeq_ids(data_root, split, modality)
     if task == "mcq":
-        return _load_expected_question_ids(data_root, split, "MCQ")
+        return _load_expected_question_ids(data_root, split, "MCQ", modality)
     if task == "tfq":
-        return _load_expected_question_ids(data_root, split, "TFQ")
+        return _load_expected_question_ids(data_root, split, "TFQ", modality)
     raise ValueError(f"Unsupported task: {task}")
 
 
@@ -149,11 +179,13 @@ def validate_task_file(
     submission: Path,
     task: str,
     expected_ids: Sequence[str],
+    ignored_extra_ids: Sequence[str],
     allow_extra_keys: bool,
 ) -> dict:
     filename = TASK_FILE_NAMES[task]
     id_field = TASK_ID_FIELDS[task]
     expected_set = set(expected_ids)
+    ignored_extra_set = set(ignored_extra_ids)
     seen_ids: set[str] = set()
     submitted_ids: List[str] = []
     errors: List[str] = []
@@ -204,11 +236,17 @@ def validate_task_file(
     submitted_set = set(submitted_ids)
     missing_ids = sorted(expected_set - submitted_set)
     extra_ids = sorted(submitted_set - expected_set)
+    ignored_extra_ids_found = sorted(set(extra_ids) & ignored_extra_set)
+    unexpected_extra_ids = sorted(set(extra_ids) - ignored_extra_set)
 
     if missing_ids:
         errors.append(f"{filename}: missing {len(missing_ids)} required ids.")
-    if extra_ids:
-        errors.append(f"{filename}: found {len(extra_ids)} unexpected ids.")
+    if unexpected_extra_ids:
+        errors.append(f"{filename}: found {len(unexpected_extra_ids)} unexpected ids.")
+    if ignored_extra_ids_found:
+        warnings.append(
+            f"{filename}: ignoring {len(ignored_extra_ids_found)} id(s) from other modalities for this track."
+        )
     if extra_key_count:
         warnings.append(f"{filename}: {extra_key_count} record(s) contain extra keys beyond `{id_field}` and `response`.")
     if empty_response_count:
@@ -223,12 +261,14 @@ def validate_task_file(
         "submitted_records": record_count,
         "unique_ids": len(submitted_set),
         "missing_count": len(missing_ids),
-        "extra_count": len(extra_ids),
+        "extra_count": len(unexpected_extra_ids),
+        "ignored_extra_count": len(ignored_extra_ids_found),
         "empty_response_count": empty_response_count,
         "errors": errors,
         "warnings": warnings,
         "missing_examples": missing_ids[:5],
-        "extra_examples": extra_ids[:5],
+        "extra_examples": unexpected_extra_ids[:5],
+        "ignored_extra_examples": ignored_extra_ids_found[:5],
     }
 
 
@@ -239,12 +279,17 @@ def main() -> None:
 
     results = []
     for task in _selected_tasks(args.task):
-        expected_ids = load_expected_ids(data_root, args.split, task)
+        expected_ids = load_expected_ids(data_root, args.split, task, args.modality)
+        ignored_extra_ids = []
+        if args.modality != "all":
+            all_ids = load_expected_ids(data_root, args.split, task, "all")
+            ignored_extra_ids = sorted(set(all_ids) - set(expected_ids))
         results.append(
             validate_task_file(
                 submission=submission,
                 task=task,
                 expected_ids=expected_ids,
+                ignored_extra_ids=ignored_extra_ids,
                 allow_extra_keys=bool(args.allow_extra_keys),
             )
         )
@@ -253,6 +298,7 @@ def main() -> None:
         "submission": str(submission),
         "data_root": str(data_root),
         "split": args.split,
+        "modality": args.modality,
         "tasks": results,
         "valid": all(result["valid"] for result in results),
     }

@@ -18,9 +18,9 @@ During development:
 
 When preparing the final submission:
 
-- Start from `sample_submission/`.
+- Start from the sample submission folder for your Codabench modality track.
 - Fill in the required `response` fields for each task file.
-- Use `validate_submission.py` to check that the package is complete and correctly formatted.
+- Use `validate_submission.py --modality <image|video|audio>` to check that the package is complete and correctly formatted.
 
 Important:
 
@@ -63,7 +63,7 @@ python3 evaluate_predictions.py \
 5. Validate a final submission package:
 
 ```bash
-python3 validate_submission.py --submission sample_submission
+python3 validate_submission.py --submission sample_submission_image --modality image
 ```
 
 By default, the starter kit looks for the blind package under `tridf-blind/`, `trident/`, or `data_blind/`. If your copy lives elsewhere, pass `--data-root /path/to/your-package-root`.
@@ -96,18 +96,29 @@ starter_kit_outputs/evaluation_results/
 
 ### Final phase-2 submission packaging
 
-Use this path when you are preparing a `private_test` submission:
+Phase 2 uses separate Codabench competitions for the Image, Video, and Audio tracks.
+The JSONL schema is unchanged, but each track submission should contain IDs for
+that modality only.
+
+Use the corresponding modality sample folder when preparing a `private_test`
+submission:
 
 ```bash
-python3 validate_submission.py --submission sample_submission
+python3 validate_submission.py --submission sample_submission_image --modality image
+python3 validate_submission.py --submission sample_submission_video --modality video
+python3 validate_submission.py --submission sample_submission_audio --modality audio
 ```
 
-Expected final files:
+Each package still contains the same four files:
 
 - `typeb_oeq.jsonl`
 - `typea_oeq.jsonl`
 - `mcq.jsonl`
 - `tfq.jsonl`
+
+Older all-modality submissions remain compatible with modality-track validation:
+extra IDs from other modalities are ignored with warnings. For clarity, use the
+track-specific sample submissions for new Phase 2 submissions.
 
 ## Tasks
 
@@ -149,8 +160,12 @@ Canonical `response` conventions for the current starter-kit tools:
 Validator behavior:
 
 - `validate_submission.py` checks required ids and that `response` is a string.
+- `--modality image`, `--modality video`, and `--modality audio` validate one Codabench modality track.
+- Track-specific validation accepts older all-modality submissions and ignores non-track IDs with warnings.
 - It warns on empty responses.
 - It does not enforce the semantic response format above.
+
+See [SUBMISSION.md](SUBMISSION.md) for the Phase 2 Codabench upload workflow.
 
 ## Local Scoring Notes
 
@@ -162,7 +177,7 @@ Validator behavior:
 - Local runs default to the bundled local evaluator unless you override `--oeq-evaluator-backend` and `--oeq-evaluator-model`.
 - For local OEQ evaluation, `--oeq-evaluator-batch-size` controls the micro-batch size used by the local text evaluator. The default is `10`.
 
-For detailed metric definitions, read [docs/METRICS.md](/project/aimm/trident/starter_kit/docs/METRICS.md).
+For detailed metric definitions, read [docs/METRICS.md](docs/METRICS.md).
 
 ### Optional OEQ evaluator override
 
@@ -191,6 +206,10 @@ Useful aliases:
 - `validate_submission.py`: submission-format validator
 - `compute_tcs.py`: standalone TCS recomputation helper for evaluation summaries
 - `sample_submission/`: submission templates for all four tasks
+- `sample_submission_image/`: Image Track submission template
+- `sample_submission_video/`: Video Track submission template
+- `sample_submission_audio/`: Audio Track submission template
+- `SUBMISSION.md`: phase-2 Codabench submission instructions
 - `examples/`: ready-to-run shell scripts
 - `docs/`: participant-facing rules and metrics
 - `starter_kit/`: internal Python package, runtime helpers, and model wrappers

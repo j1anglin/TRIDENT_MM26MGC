@@ -2,6 +2,13 @@
 
 This directory contains starter submission templates generated from the current `private_test` identifiers in the blind data package.
 
+For Phase 2 Codabench submissions, TRIDENT uses separate Image, Video, and Audio
+tracks. New submissions should use the corresponding modality-specific sample
+folder (`sample_submission_image/`, `sample_submission_video/`, or
+`sample_submission_audio/`) when those folders are provided by the organizers.
+The JSONL schema is the same as this folder; only the required IDs differ by
+track.
+
 Files:
 
 - `typeb_oeq.jsonl`
@@ -32,5 +39,13 @@ Notes:
 Validate from the starter-kit root with:
 
 ```bash
-python3 validate_submission.py --submission sample_submission
+python3 validate_submission.py --submission sample_submission --modality all
+```
+
+For a modality-specific Codabench track, validate with:
+
+```bash
+python3 validate_submission.py --submission sample_submission_image --modality image
+python3 validate_submission.py --submission sample_submission_video --modality video
+python3 validate_submission.py --submission sample_submission_audio --modality audio
 ```

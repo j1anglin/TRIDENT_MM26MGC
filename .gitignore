@@ -3,6 +3,8 @@ __pycache__/
 
 starter_kit_outputs/
 starter_kit_eval_cache/
+build/
+official_scoring_outputs/
 
 .venv/
 .env

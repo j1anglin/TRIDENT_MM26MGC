@@ -96,9 +96,9 @@ starter_kit_outputs/evaluation_results/
 
 ### Final phase-2 submission packaging
 
-Phase 2 uses separate Codabench competitions for the Image, Video, and Audio tracks.
-The JSONL schema is unchanged, but each track submission should contain IDs for
-that modality only.
+The Final Test Phase uses separate Codabench competitions and leaderboards for
+the Image, Video, and Audio tracks. Each team is allowed a maximum of 3
+submissions per day per track.
 
 Use the corresponding modality sample folder when preparing a `private_test`
 submission:
@@ -109,12 +109,16 @@ python3 validate_submission.py --submission sample_submission_video --modality v
 python3 validate_submission.py --submission sample_submission_audio --modality audio
 ```
 
-Each package still contains the same four files:
+Submissions must be uploaded as a ZIP archive containing exactly these four
+JSONL files at the root level:
 
 - `typeb_oeq.jsonl`
 - `typea_oeq.jsonl`
 - `mcq.jsonl`
 - `tfq.jsonl`
+
+Do not submit a single JSON file, and do not place the required JSONL files
+inside an extra folder.
 
 Older all-modality submissions remain compatible with modality-track validation:
 extra IDs from other modalities are ignored with warnings. For clarity, use the
